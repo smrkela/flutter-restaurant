@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:scoped_model/scoped_model.dart';
 
 import '../models/product.dart';
-import '../scoped-models/products.dart';
+import '../scoped-models/main.dart';
 
 class ProductEditPage extends StatefulWidget {
   @override
@@ -68,37 +68,64 @@ class _ProductEditPageState extends State<ProductEditPage> {
         });
   }
 
-  void _submitForm(Function addProduct, Function updateProduct,
+  void _submitForm(
+      Function addProduct, Function updateProduct, Function setSelectedProduct,
       [int selectedProductIndex]) {
     if (!_formKey.currentState.validate()) return;
 
     _formKey.currentState.save();
 
-    Product product = Product(
-      title: _formData['title'],
-      description: _formData['description'],
-      price: _formData['price'],
-      image: _formData['image'],
-    );
+    String title = _formData['title'];
+    String description = _formData['description'];
+    double price = _formData['price'];
+    String image = _formData['image'];
 
-    if (selectedProductIndex == null) {
-      addProduct(product);
+    if (selectedProductIndex == -1) {
+      addProduct(title, description, image, price).then((bool success) {
+        if (success) {
+          Navigator.pushReplacementNamed(context, '/products')
+              .then((_) => setSelectedProduct(null));
+        } else {
+          showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: Text('Something went wrong'),
+                  content: Text('Please try again'),
+                  actions: <Widget>[
+                    FlatButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: Text('Okay'),
+                    )
+                  ],
+                );
+              });
+        }
+      });
     } else {
-      updateProduct(product);
+      updateProduct(title, description, image, price).then((_) {
+        Navigator.pushReplacementNamed(context, '/products')
+            .then((_) => setSelectedProduct(null));
+      });
     }
-
-    Navigator.pushReplacementNamed(context, '/products');
   }
 
   Widget _buildSubmitButton() {
     return ScopedModelDescendant(
-      builder: (BuildContext context, Widget child, ProductsModel model) {
-        return RaisedButton(
-          child: Text('Save'),
-          textColor: Colors.white,
-          onPressed: () => _submitForm(model.addProduct, model.updateProduct,
-              model.selectedProductIndex),
-        );
+      builder: (BuildContext context, Widget child, MainModel model) {
+        return model.isLoading
+            ? Center(child: CircularProgressIndicator())
+            : RaisedButton(
+                child: Text('Save'),
+                textColor: Colors.white,
+                onPressed: () => _submitForm(
+                    model.addProduct,
+                    model.updateProduct,
+                    model.selectProduct,
+                    model.selectedProductIndex),
+              );
       },
     );
   }
@@ -137,10 +164,10 @@ class _ProductEditPageState extends State<ProductEditPage> {
   @override
   Widget build(BuildContext context) {
     return ScopedModelDescendant(
-      builder: (BuildContext context, Widget child, ProductsModel model) {
+      builder: (BuildContext context, Widget child, MainModel model) {
         final pageContent = _buildPageContent(context, model.selectedProduct);
 
-        return model.selectedProductIndex == null
+        return model.selectedProductIndex == -1
             ? pageContent
             : Scaffold(
                 appBar: AppBar(
